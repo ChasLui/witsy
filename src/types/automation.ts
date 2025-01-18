@@ -10,14 +10,22 @@ export interface ShortcutCallbacks {
   readaloud: () => void
   transcribe: () => void
   scratchpad: () => void
+  realtime: () => void
+}
+
+export type Application = {
+  id: string
+  name: string
+  path: string
+  window: string
 }
 
 export interface Automator {
-  getForemostAppId(): Promise<string>
-  getForemostAppPath(): Promise<string>
+  getForemostApp(): Promise<Application|null>
   selectAll(): Promise<void>
   moveCaretBelow(): Promise<void>
   copySelectedText(): Promise<void>
+  deleteSelectedText(): Promise<void>
   pasteText(): Promise<void>
 }
 

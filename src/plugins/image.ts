@@ -16,9 +16,9 @@ export default class extends Plugin {
 
   isEnabled(): boolean {
     return this.config?.enabled && (
-      (this.config.engine == 'openai' && store.config?.engines.openai.apiKey != null) ||
-      (this.config.engine == 'huggingface' && store.config?.engines.huggingface.apiKey != null) ||
-      (this.config.engine == 'replicate' && store.config?.engines.replicate.apiKey != null)
+      (this.config.engine == 'openai' && store.config?.engines.openai.apiKey?.trim().length > 0) ||
+      (this.config.engine == 'huggingface' && store.config?.engines.huggingface.apiKey?.trim().length > 0) ||
+      (this.config.engine == 'replicate' && store.config?.engines.replicate.apiKey?.trim().length > 0)
     )
   }
 
@@ -27,7 +27,7 @@ export default class extends Plugin {
   }
 
   getDescription(): string {
-    return 'Generate an image based on a prompt. Returns the url of the image and a description of the image. Create only one image at a time unless explicitely asked to do otherwise. Always embed the image visible in the final response. Do not just include a link to the image.'
+    return this.config.description
   }
 
   getPreparationDescription(): string {
@@ -165,7 +165,6 @@ export default class extends Plugin {
     // return an object
     return {
       url: fileUrl,
-      description: parameters?.prompt,
     }
 
   }  
@@ -198,7 +197,6 @@ export default class extends Plugin {
     // return an object
     return {
       url: fileUrl,
-      description: parameters?.prompt
     }
 
   }  
@@ -229,7 +227,6 @@ export default class extends Plugin {
     // return an object
     return {
       url: fileUrl,
-      description: parameters?.prompt
     }
 
   }

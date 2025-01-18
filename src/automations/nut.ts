@@ -1,5 +1,5 @@
 
-import { Automator } from '../types/automation';
+import { Application, Automator } from '../types/automation';
 import { wait } from '../main/utils';
 
 let nut: any|null = null;
@@ -22,12 +22,9 @@ export default class NutAutomator implements Automator {
     }
   }
   
-  async getForemostAppId(): Promise<string> {
-    throw new Error('Method not implemented.');
-  }
-
-  async getForemostAppPath(): Promise<string> {
-    throw new Error('Method not implemented.');
+  async getForemostApp(): Promise<Application|null> {
+    console.warn('getForemostApp not implemented (expected)');
+    return null;
   }
 
   async selectAll() {
@@ -47,6 +44,12 @@ export default class NutAutomator implements Automator {
   async copySelectedText() {
     if (!await this.setup()) throw new Error('nutjs not loaded');
     await nut.keyboard.type(nut.Key.LeftControl, nut.Key.C);
+    await wait(delay);
+  }
+
+  async deleteSelectedText() {
+    if (!await this.setup()) throw new Error('nutjs not loaded');
+    await nut.keyboard.type(nut.Key.Delete);
     await wait(delay);
   }
 

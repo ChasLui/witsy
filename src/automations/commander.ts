@@ -2,7 +2,7 @@
 import { Configuration } from '../types/config'
 import { RunCommandParams } from '../types/automation'
 import { App, Notification } from 'electron'
-import { getCachedText, putCachedText } from '../main/utils'
+import { getCachedText, putCachedText, wait } from '../main/utils'
 import { loadSettings } from '../main/config'
 import LlmFactory from '../llms/llm'
 import Automator from './automator'
@@ -24,14 +24,35 @@ export default class Commander {
       return
     }
 
-    // hide active windows
-    await window.hideWindows();
-    await window.releaseFocus();
-
-    // grab text
+    // get started
+    console.log('Commander init');
+    const start = new Date().getTime();
     const automator = new Automator();
-    const text = await automator.getSelectedText();
-    const sourceApp = await automator.getForemostAppPath();
+
+    // perf log
+    //console.log(`Init done [${new Date().getTime() - start}ms]`);
+
+    // wait for focus
+    await wait(250)
+
+    // // perf log
+    // console.log(`Windows hidden and focus released [${new Date().getTime() - start}ms]`);
+
+    // grab text repeatedly
+    let text = null;
+    const timeout = 1000;
+    const grabStart = new Date().getTime();
+    while (true) {
+      text = await automator.getSelectedText();
+      if (text != null && text.trim() !== '') {
+        break;
+      }
+      if (new Date().getTime() - grabStart > timeout) {
+        console.log(`Grab text timeout after ${timeout}ms`);
+        break;
+      }
+      await wait(100);
+    }
 
     // error
     if (text == null) {
@@ -40,7 +61,6 @@ export default class Commander {
           title: 'Witsy',
           body: 'An error occurred while trying to grab the text. Please check Privacy & Security settings.'
         }).show()
-        window.restoreWindows();
       } catch (error) {
         console.error('Error showing notification', error);
       }
@@ -55,7 +75,6 @@ export default class Commander {
           body: 'Please highlight the text you want to analyze'
         }).show()
         console.log('No text selected');
-        window.restoreWindows();
       } catch (error) {
         console.error('Error showing notification', error);
       }
@@ -63,11 +82,12 @@ export default class Commander {
     }
 
     // log
-    console.debug('Text grabbed:', `${text.slice(0, 50)}…`);
+    console.debug(`Text grabbed: ${text.slice(0, 50)}… [${new Date().getTime() - start}ms]`);
 
     // go on with a cached text id
     const textId = putCachedText(text);
-    await window.openCommandPicker({ textId, sourceApp });
+    const sourceApp = await automator.getForemostApp();
+    window.openCommandPicker({ textId, sourceApp });
 
   }
 
@@ -101,45 +121,24 @@ export default class Commander {
 
       // build prompt
       const prompt = template.replace('{input}', text);
-      const promptId = putCachedText(prompt);
 
-      // ask me anything is special
-      if (command.id == askMeAnythingId) {
-
-        // build the params
-        const params = {
-          promptId: putCachedText(prompt),
-          sourceApp: sourceApp,
-          engine: engine || command.engine,
-          model: model || command.model
-        };          
-          
-        // and open the window
-        window.openPromptAnywhere(params);
-        return true;
-
-      } else {
-
-        // build the params
-        const params = {
-          promptId: promptId,
-          engine,
-          model
-        };
-
-        // and open the window
-        window.openCommandResult(params);
-        return true;
-
-      }
+      // build the params
+      const params = {
+        promptId: putCachedText(prompt),
+        sourceApp: sourceApp,
+        engine: engine || command.engine,
+        model: model || command.model,
+        execute: command.id != askMeAnythingId,
+        replace: true,
+      };
+      
+      // and open the window
+      window.openPromptAnywhere(params);
+      return true;
 
     } catch (error) {
       console.error('Error while executing command', error);
     }
-
-    // error
-    await window.restoreWindows();
-    await window.releaseFocus();
 
     // done
     return false;

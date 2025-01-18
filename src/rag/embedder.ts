@@ -1,5 +1,5 @@
 
-import { Configuration } from 'types/config'
+import { Configuration, CustomEngineConfig } from 'types/config'
 import { App } from 'electron'
 import defaults from '../../defaults/settings.json'
 import similarity from 'compute-cosine-similarity'
@@ -7,6 +7,7 @@ import similarity from 'compute-cosine-similarity'
 import { Ollama } from 'ollama/dist/browser.mjs'
 import OpenAI from 'openai'
 import { Embedding } from 'openai/resources'
+import LlmFactory from '../llms/llm'
 // import path from 'path'
 // import fs from 'fs'
 
@@ -45,6 +46,9 @@ export default class Embedder {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async init(app: App): Promise<void> {
     
+    // we need this
+    const llmFactory = new LlmFactory(this.config)
+    
     if (this.engine === 'openai') {
 
       this.openai = new OpenAI({
@@ -82,53 +86,27 @@ export default class Embedder {
     //   } else {
     //     throw new Error(`Unsupported FastEmbed model: ${this.model}`)
     //   }
+
+    } else if (llmFactory.isCustomEngine(this.engine)) {
+
+      const engineConfig = this.config.engines[this.engine] as CustomEngineConfig
+      if (engineConfig.api === 'openai') {
+        this.openai = new OpenAI({
+          apiKey: engineConfig.apiKey,
+          baseURL: engineConfig.baseURL,
+          dangerouslyAllowBrowser: true
+        })
+      }
     
-    } else {
+    }
+
+    // check
+    if (!this.openai && !this.ollama) {
       throw new Error(`Unsupported embedding engine: ${this.engine}`)
     }
   }
 
-  static async dimensions(config: Configuration, engine: string, model: string): Promise<number> {
-
-    // open ai
-    if (engine === 'openai') {
-      if (model === 'text-embedding-ada-002') return 1536
-      if (model === 'text-embedding-3-small') return 1536
-      if (model === 'text-embedding-3-large') return 3072
-    }
-
-    // ollama
-    if (engine === 'ollama') {
-      const ollama = new Ollama({ host: config.engines.ollama.baseURL, })
-      const info = await ollama.show({ model: model })
-      for (const item in info.model_info) {
-        if (item.includes('embedding_length')) {
-          // @ts-expect-error access through []
-          return info.model_info[item] as number
-        }
-      }
-    }
-
-    // // fast embed
-    // if (engine === 'fastembed') {
-    //   if (model === 'all-MiniLM-L6-v2') return 384
-    //   if (model === 'bge-base-en') return 768
-    //   if (model === 'bge-base-en-v1.5') return 768
-    //   if (model === 'bge-small-en') return 384
-    //   if (model === 'bge-small-en-v1.5') return 384
-    //   if (model === 'bge-small-zh-v1.5') return 512
-    //   if (model === 'multilingual-e5-large') return 1024
-    // }
-
-    // too bad
-    return 0
-
-  }
-
   async embed(texts: string[]): Promise<number[][]> {
-
-    // for testing purposes
-    //return Array(Embedder.dimensions(this.engine, this.model)).fill(0)
 
     // openai
     if (this.openai) {

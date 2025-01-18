@@ -14,12 +14,6 @@ export default class ReadAloud {
       return
     }
 
-    // hide active windows
-    if (!window.isMainWindowFocused()) {
-      await window.hideWindows();
-      await window.releaseFocus();
-    }
-
     // grab text
     const automator = new Automator();
     const text = await automator.getSelectedText();
@@ -63,7 +57,8 @@ export default class ReadAloud {
 
     // go on with a cached text id
     const textId = putCachedText(text);
-    await window.openReadAloudPalette(textId)
+    const sourceApp = await automator.getForemostApp();
+    await window.openReadAloudPalette({ textId, sourceApp: JSON.stringify(sourceApp) });
 
   }
 

@@ -2,7 +2,7 @@
 
 import { type Configuration } from '../types/config'
 import { SpeechPlayer } from 'openai-speech-stream-player'
-import Tts from '../voice/tts'
+import getTTSEngine, { textMaxLength as importedTextMaxLength, SynthesisResponse } from '../voice/tts'
 
 export type AudioState = 'idle'|'loading'|'playing'|'paused'
 export type AudioStatus = { state: AudioState, uuid: string }
@@ -53,8 +53,8 @@ class AudioPlayer {
     try {
   
       // get the stream
-      const tts = new Tts(this.config)
-      const response = await tts.synthetize(content)
+      const tts = getTTSEngine(this.config)
+      const response: SynthesisResponse = await tts.synthetize(content)
 
       // have we been cancelled
       if (this.uuid != uuid) {
@@ -79,7 +79,16 @@ class AudioPlayer {
         mimeType: 'audio/mpeg',
       })
       await this.player.init()
-      this.player.feedWithResponse(response.content)
+
+      if (response.content instanceof Response) {
+        this.player.feedWithResponse(response.content)
+      } else if ('read' in response.content) {
+        for await (const chunk of response.content) {
+          this.player.feed(chunk);
+        }
+      } else {
+        throw new Error('Invalid response format')
+      }
 
     } catch (e) {
       console.error(e)
@@ -130,4 +139,4 @@ export default function useAudioPlayer(config: Configuration) {
   return instance
 }
 
-export const textMaxLength = Tts.textMaxLength
+export const textMaxLength = importedTextMaxLength

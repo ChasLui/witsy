@@ -1,15 +1,12 @@
 
-import { Automator } from '../types/automation';
+import { Application, Automator } from '../types/automation';
 import { runVbs } from '@el3um4s/run-vbs'
 
 export default class implements Automator {
 
-  async getForemostAppId(): Promise<string> {
-    throw new Error('Method not implemented.');
-  }
-
-  async getForemostAppPath(): Promise<string> {
-    throw new Error('Method not implemented.');
+  async getForemostApp(): Promise<Application|null> {
+    console.warn('getForemostApp not implemented (expected)');
+    return null;
   }
 
   async selectAll() {
@@ -48,6 +45,18 @@ export default class implements Automator {
     // run it
     await runVbs({ vbs: script }) 
 
+  }
+
+  async deleteSelectedText() {
+
+    const script = `
+      Set WshShell = WScript.CreateObject("WScript.Shell")
+      WshShell.SendKeys "{DELETE}"
+      WScript.Sleep 200
+    `
+
+    // run it
+    await runVbs({ vbs: script }) 
   }
 
   async pasteText() {

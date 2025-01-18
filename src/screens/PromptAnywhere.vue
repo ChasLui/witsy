@@ -10,18 +10,20 @@
             </div>
           </template>
           <template v-slot:actions>
-            <div class="info" v-if="chat">
-              <BIconGlobe /> {{ chat.engine }} / {{ chat.model }}
+            <div class="info" v-if="chat" @click="onEngineModel">
+              <BIconGlobe />
+              <span> {{ llmFactory.getEngineName(chat.engine) }} / {{ chat.model }}</span>
             </div>
           </template>
         </Prompt>
       </ResizableHorizontal>
       <div class="spacer" />
       <ResizableHorizontal :min-width="500" :resize-elems="false" @resize="onResponseResize" v-if="response">
-        <OutputPanel ref="output" :message="response" @close="onClose" @clear="onClear" @chat="onChat"/>
+        <OutputPanel ref="output" :message="response" :source-app="showParams?.sourceApp" :show-replace="showReplace" @close="onClose" @clear="onClear" @chat="onChat"/>
       </ResizableHorizontal>
     </div>
   </div>
+  <EngineModelPicker ref="engineModelPicker" :engine="chat.engine" :model="chat.model" @save="onUpdateEngineModel" v-if="chat"/>
 </template>
 
 <script setup lang="ts">
@@ -33,6 +35,7 @@ import { availablePlugins } from '../plugins/plugins'
 import { LlmEngine } from 'multi-llm-ts'
 import { SendPromptParams } from '../components/Prompt.vue'
 import ResizableHorizontal from '../components/ResizableHorizontal.vue'
+import EngineModelPicker from '../screens/EngineModelPicker.vue'
 import LlmFactory from '../llms/llm'
 import Prompt from '../components/Prompt.vue'
 import OutputPanel from '../components/OutputPanel.vue'
@@ -53,11 +56,14 @@ const generator = new Generator(store.config)
 const llmFactory = new LlmFactory(store.config)
 
 const prompt = ref(null)
+const engineModelPicker: Ref<typeof EngineModelPicker> = ref(null)
 const sourceApp: Ref<ExternalApp|null> = ref(null)
 const output = ref(null)
 const chat: Ref<Chat> = ref(null)
 const response: Ref<Message> = ref(null)
+const showReplace = ref(false)
 
+let showParams: anyDict = {}
 const props = defineProps({
   extra: Object
 })
@@ -80,14 +86,14 @@ const iconData = computed(() => {
 
 onMounted(() => {
   
+  // shortcuts work better at document level
+  document.addEventListener('keyup', onKeyUp)
+  document.addEventListener('keydown', onKeyDown)  
+
   // events
   onEvent('send-prompt', onSendPrompt)
   onEvent('stop-prompting', onStopGeneration)
   window.api.on('show', onShow)
-
-  // shotcuts work better at document level
-  document.addEventListener('keyup', onKeyUp)
-  document.addEventListener('keydown', onKeyDown)  
 
   // query params
   if (props.extra) {
@@ -110,6 +116,7 @@ const processQueryParams = (params?: anyDict) => {
 
   // log
   console.log('Processing query params', JSON.stringify(params))
+  showParams = params
 
   // reset stuff
   hiddenPrompt = null
@@ -118,6 +125,9 @@ const processQueryParams = (params?: anyDict) => {
   let userEngine = null
   let userModel = null
   let userExpert = null
+
+  // replace is easy
+  showReplace.value = params?.replace || false
 
   // auto-select prompt
   if (params?.promptId) {
@@ -132,10 +142,10 @@ const processQueryParams = (params?: anyDict) => {
   }
 
   // auto-select expert
-  if (params?.foremostApp) {
+  if (params?.sourceApp) {
     for (const expert of store.experts) {
-      if (expert.triggerApps?.find((app) => app.identifier == params.foremostApp)) {
-        console.log(`Triggered on ${params.foremostApp}: filling prompt with expert ${expert.name}`)
+      if (expert.triggerApps?.find((app) => app.identifier == params.sourceApp.id)) {
+        console.log(`Triggered on ${params.sourceApp.id}: filling prompt with expert ${expert.name}`)
         userExpert = expert
         break
       }
@@ -149,8 +159,8 @@ const processQueryParams = (params?: anyDict) => {
   }
 
   // source app
-  if (userPrompt?.length && params?.sourceApp?.length) {
-    sourceApp.value = window.api.file.getAppInfo(params.sourceApp)
+  if (userPrompt?.length && params?.sourceApp) {
+    sourceApp.value = window.api.file.getAppInfo(params.sourceApp.path)
     if (sourceApp.value) {
       hiddenPrompt = userPrompt
       userPrompt = null
@@ -177,6 +187,12 @@ const processQueryParams = (params?: anyDict) => {
 
   // init llm
   initLlm(userEngine, userModel)
+
+  // execute
+  if (params?.execute) {
+    onSendPrompt({ prompt: userPrompt, expert: userExpert, attachment: null, docrepo: null })
+    return
+  }
 
   // focus prompt
   if (prompt.value) {
@@ -222,6 +238,17 @@ const initLlm = (engine?: string, model?: string) => {
   // set engine model
   chat.value.setEngineModel(engine, model)
 
+}
+
+const onEngineModel = () => {
+  engineModelPicker.value.show()
+}
+
+const onUpdateEngineModel = (payload: { engine: string, model: string}) => {
+  const { engine, model } = payload
+  store.config.llm.engine = engine
+  store.config.engines[engine].model.chat = model
+  initLlm(engine, model)
 }
 
 const onKeyDown = (ev: KeyboardEvent) => {
@@ -282,6 +309,7 @@ const onClear = () => {
 
   // reset all messages
   initChat()
+  initLlm()
 
   // reset response
   output.value?.cleanUp()
@@ -312,7 +340,7 @@ const onClose = () => {
   // document.removeEventListener('keydown', onKeyDown)
 
   // done
-  window.api.anywhere.close()
+  window.api.anywhere.close(showParams?.sourceApp)
 }
 
 const onStopGeneration = () => {
@@ -325,6 +353,7 @@ const onSendPrompt = async (params: SendPromptParams) => {
 
     // deconstruct params
     const { prompt, attachment, docrepo, expert } = params
+    //console.log('PromptAnywhere.onSendPrompt', prompt, attachment, docrepo, expert)
   
     // this should not happen but it happens
     if (chat.value === null) {
@@ -459,13 +488,16 @@ const onResponseResize= (deltaX: number) => {
     .actions {
       width: calc(100% - 12px);
       padding: 4px 12px;
+      
       .icon {
         margin-right: 8px;
       }
+      
       .info {
         display: flex;
         align-items: center;
         color: var(--prompt-icon-color);
+        cursor: pointer;
         opacity: 0.5;
         font-size: 10pt;
         margin-left: auto;
@@ -528,6 +560,27 @@ const onResponseResize= (deltaX: number) => {
     }
   }
 
+  .response {
+    .message {
+      max-height: 65vh;
+    }
+  }
+
+}
+
+dialog#engine-model-picker {
+
+  position: relative;
+  top: -30%;
+
+  &::backdrop {
+    display: none;
+  }
+
+}
+
+body.macos dialog#engine-model-picker {
+  top: -50%;
 }
 
 </style>

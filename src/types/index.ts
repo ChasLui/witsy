@@ -2,7 +2,7 @@
 import { LlmChunkTool, Message as IMessageBase, Attachment as IAttachmentBase } from 'multi-llm-ts'
 import { Configuration } from './config'
 import { Size } from 'electron'
-import { RunCommandParams } from './automation'
+import { Application, RunCommandParams } from './automation'
 import { DocRepoQueryResponseItem, DocumentBase } from './rag'
 
 export type strDict = { [key: string]: string }
@@ -84,6 +84,8 @@ export type Command = {
   engine: string,
   model: string,
 }
+
+export const disabledShortcutKey: string = 'none'
 
 export type Shortcut = {
   alt?: boolean
@@ -210,8 +212,8 @@ declare global {
       }
       automation: {
         getText(id: string): string
-        insert(text: string): void
-        replace(text: string): void
+        insert(text: string, sourceApp: Application): void
+        replace(text: string, sourceApp: Application): void
       }
       chat: {
         open(chatId: string): void
@@ -220,9 +222,7 @@ declare global {
         load(): Command[]
         save(commands: Command[]): void
         cancel(): void
-        closePicker(): void
-        closeResult(): void
-        resizeResult(deltaX: number, deltaY: number): void
+        closePicker(sourceApp: Application): void
         run(params: RunCommandParams): void
         isPromptEditable(id: string): boolean
         import(): boolean
@@ -231,7 +231,7 @@ declare global {
       anywhere: {
         prompt(): void
         insert(prompt: string): void
-        close(): void
+        close(sourceApp: Application): void
         resize(deltaX: number, deltaY: number): void
       }
       experts: {
@@ -253,7 +253,7 @@ declare global {
         query(id: string, text: string): Promise<DocRepoQueryResponseItem[]>
       },
       readaloud: {
-        closePalette(): void
+        closePalette(sourceApp: Application): void
       },
       whisper: {
         initialize(): void

@@ -81,10 +81,13 @@ publish:
 	@git diff --quiet || (echo "There are uncommitted changes. Stopping." && exit 1)
 	@$(MAKE) increment-build-number
 	@$(MAKE) commit-build-number
-	gh release create v$(VERSION) --repo https://github.com/nbonamy/witsy --title $(VERSION) --generate-notes --draft
+	gh release create v$(VERSION) --title $(VERSION) --generate-notes --draft
 	gh workflow run build-darwin-x64.yml
 	gh workflow run build-darwin-arm64.yml
 	gh workflow run build-windows.yml
 	gh workflow run build-linux.yml
 	node build/monitor_gh_builds.mjs
 	gh release edit v$(VERSION) --draft=false
+	@echo "{\"schemaVersion\":1,\"label\":\"Version\",\"message\":\"$(VERSION)\",\"labelColor\":\"rgb(61, 70, 78)\",\"color\":\"blue\"}" > $(TMPDIR)/version.json
+	gh gist edit 8febadb1ecb32078db4c003d0c09f565 -f version.json $(TMPDIR)/version.json
+	@rm $(TMPDIR)/version.json

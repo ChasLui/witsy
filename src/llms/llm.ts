@@ -8,7 +8,7 @@ import OpenAI from './openai'
 
 export const standardEngines = [ 'openai', 'anthropic', 'google', 'xai', 'ollama', 'mistralai', 'openrouter', 'deepseek', 'groq', 'cerebras' ]
 export const staticModelsEngines = [ 'anthropic', 'google', 'xai', 'deepseek', 'groq', 'cerebras' ]
-export const nonChatEngines = [ 'huggingface', 'replicate' ]
+export const nonChatEngines = [ 'huggingface', 'replicate', 'elevenlabs' ]
 
 export default class LlmFactory {
 
@@ -16,6 +16,16 @@ export default class LlmFactory {
 
   constructor(config: Configuration) {
     this.config = config
+  }
+
+  getEngineName = (engine: string): string => {
+    if (!this.config.engines[engine]) {
+      return 'custom'
+    } else if (this.isCustomEngine(engine)) {
+      return (this.config.engines[engine] as CustomEngineConfig)?.label
+    } else {
+      return engine
+    }
   }
 
   getChatEngines = (): string[] => {

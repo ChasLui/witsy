@@ -94,6 +94,9 @@
       "key": "N",
       "meta": true,
       "alt": true
+    },
+    "realtime": {
+      "key": "none"
     }
   },
   "rag": {
@@ -110,6 +113,11 @@
     "silenceDuration": 2000,
     "silenceAction": "stop_transcribe"
   },
+  "tts": {
+    "engine": "openai",
+    "model": "tts-1",
+    "voice": "alloy"
+},
   "engines": {
     "openai": {
       "apiKey": "",
@@ -121,10 +129,6 @@
       "model": {
         "chat": "gpt-4o",
         "image": "dall-e-3"
-      },
-      "tts": {
-        "model": "tts-1",
-        "voice": "alloy"
       },
       "realtime": {
         "model": "gpt-4o-mini-realtime-preview",
@@ -236,6 +240,12 @@
         "image": "black-forest-labs/flux-schnell",
         "video": "minimax/video-01"
       }
+    },
+    "elevenlabs": {
+      "apiKey": "",
+      "models": {
+        "tts": []
+      }
     }
   },
   "plugins": {
@@ -253,7 +263,8 @@
     },
     "image": {
       "enabled": true,
-      "engine": "openai"
+      "engine": "openai",
+      "description": "Generate an image based on a prompt. Returns the url of the image starting with the \"file://\" scheme which is OK. Create only one image at a time unless explicitely asked to do otherwise. Always embed the image visible in the final response using \"![title](url)\" markdown syntax. Come up with a short title for the image."
     },
     "memory": {
       "enabled": false,
@@ -261,7 +272,8 @@
     },
     "video": {
       "enabled": true,
-      "engine": "replicate"
+      "engine": "replicate",
+      "description": "Generate a video based on a prompt. Returns the url of the video starting with the \"file://\" scheme which is OK. Create only one video at a time unless explicitely asked to do otherwise. Always embed the video visible in the final response using \"![title](url)\" markdown syntax. Come up with a short title for the video."
     },
     "vega": {
       "enabled": true

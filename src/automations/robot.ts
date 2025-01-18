@@ -1,5 +1,5 @@
 
-import { Automator } from '../types/automation';
+import { Application, Automator } from '../types/automation';
 import { wait } from '../main/utils';
 
 let robot: any|null = null;
@@ -23,12 +23,9 @@ export default class RobotAutomator implements Automator {
     }
   }
   
-  async getForemostAppId(): Promise<string> {
-    throw new Error('Method not implemented.');
-  }
-
-  async getForemostAppPath(): Promise<string> {
-    throw new Error('Method not implemented.');
+  async getForemostApp(): Promise<Application|null> {
+    console.warn('getForemostApp not implemented (expected)');
+    return null;
   }
 
   async selectAll() {
@@ -48,6 +45,12 @@ export default class RobotAutomator implements Automator {
   async copySelectedText() {
     if (!await this.setup()) throw new Error('Robotjs not loaded');
     robot.keyTap('c', 'control');
+    await wait(delay);
+  }
+
+  async deleteSelectedText() {
+    if (!await this.setup()) throw new Error('Robotjs not loaded');
+    robot.keyTap('delete');
     await wait(delay);
   }
 

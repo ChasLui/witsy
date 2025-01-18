@@ -1,9 +1,10 @@
 
-import { strDict } from 'types/index';
-import { CreateWindowOpts } from 'types/window';
+import { strDict } from '../../types/index';
+import { CreateWindowOpts, ReleaseFocusOpts } from '../../types/window';
 import { app, BrowserWindow, BrowserWindowConstructorOptions, Menu, nativeTheme, screen, shell } from 'electron';
+import MacosAutomator from '../../automations/macos';
 import { promptAnywhereWindow } from './anywhere';
-import { mainWindow } from './main';
+import { commandPicker } from './commands';
 import * as config from '../config';
 import { wait } from '../utils';
 import Store from 'electron-store';
@@ -187,14 +188,41 @@ export const createWindow = (opts: CreateWindowOpts = {}) => {
 };
 
 // https://ashleyhindle.com/thoughts/electron-returning-focus
-export const releaseFocus = async () => {
 
+
+
+export const releaseFocus = async (opts?: ReleaseFocusOpts) => {
+
+  // defaults
+  opts = {
+    sourceApp: null,
+    delay: 500,
+    ...opts
+  };
+
+  // platform specific
   if (process.platform === 'darwin') {
 
-    Menu.sendActionToFirstResponder('hide:');
-    await wait(500);
+    let focused = false;
 
-  } else if (process.platform === 'win32') {
+    // if we have an app then target it
+    if (opts?.sourceApp) {
+
+      try {
+        console.log(`Releasing focus to ${opts.sourceApp.id} / ${opts.sourceApp.window}`);
+        const macosAutomator = new MacosAutomator();
+        focused = await macosAutomator.focusApp(opts.sourceApp);
+      } catch (error) {
+        console.error('Error while focusing app', error);
+      }
+
+    }
+
+    if (!focused) {
+      Menu.sendActionToFirstResponder('hide:');
+    }
+
+} else if (process.platform === 'win32') {
 
     const dummyTransparentWindow = new BrowserWindow({
         width: 1,
@@ -207,63 +235,24 @@ export const releaseFocus = async () => {
 
     dummyTransparentWindow.close();
 
-    await wait(500);
   }
+
+  // pause
+  if (opts.delay > 0) {
+    await wait(opts.delay);
+  }
+
 };
 
-let windowsToRestore: BrowserWindow[] = [];
-export const hideWindows = async (except: BrowserWindow[] = []) => {
-
-  // remember to restore all windows
-  windowsToRestore = [];
-  try {
-    // console.log('Hiding windows');
-    const windows = BrowserWindow.getAllWindows();
-    for (const window of windows) {
-      if (except.includes(window)) {
-        continue;
-      }
-      if (!window.isDestroyed() && window.isVisible() && !window.isMinimized()) {
-        windowsToRestore.push(window);
-        window.hide();
-      }
-    }
-  } catch (error) {
-    console.error('Error while hiding active windows', error);
-  }
-
+export const persistentWindows = (): BrowserWindow[] => {
+  return [ promptAnywhereWindow, commandPicker ]
 }
 
-export const restoreWindows = () => {
-
-  // log
-  // console.log(`Restoring ${windowsToRestore.length} windows`)
-
-  // restore main window first
-  windowsToRestore.sort((a, b) => {
-    if (a === mainWindow) return -1;
-    if (b === mainWindow) return 1;
-    return 0;
-  })
-
-  // now restore
-  for (const window of windowsToRestore) {
-    try {
-      window.restore();
-      //window.showInactive();
-    } catch (error) {
-      console.error('Error while restoring window', error);
-    }
-  }
-
-  // done
-  windowsToRestore = [];
-
-};
-
 export const areAllWindowsClosed = () => {
-  const windows = BrowserWindow.getAllWindows();
-  return windows.length === 0 || (windows.length === 1 && windows[0] === promptAnywhereWindow);
+  let windows = BrowserWindow.getAllWindows();
+  const permanentWindows = persistentWindows();
+  windows = windows.filter(window => !permanentWindows.includes(window));
+  return windows.length === 0;
 };
 
 export const notifyBrowserWindows = (event: string, ...args: any[]) => {

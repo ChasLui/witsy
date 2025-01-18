@@ -29,10 +29,11 @@ vi.mock('electron', async() => {
 vi.mock('../../src/main/window.ts', async () => {
   return {
     openCommandPicker: vi.fn(),
-    openCommandResult: vi.fn(),
-    openPromptAnywhere: vi.fn(),
-    hideWindows: vi.fn(),
-    restoreWindows: vi.fn(),
+    openPromptAnywhere: vi.fn((params) => {
+      if (params.sourceApp === 'error') {
+        throw new Error('Error')
+      }
+    }),
     releaseFocus: vi.fn()
   }
 })
@@ -40,9 +41,8 @@ vi.mock('../../src/main/window.ts', async () => {
 // mock automator
 vi.mock('../../src/automations/automator.ts', async () => {
   const Automator = vi.fn()
-  Automator.prototype.getForemostAppId =  vi.fn(() => 'appId')
-  Automator.prototype.getForemostAppPath =  vi.fn(() => 'appPath')
-  Automator.prototype.moveCaretBelow =  vi.fn()
+  Automator.prototype.getForemostApp = vi.fn(() => ({ id: 'appId', name: 'appName', path: 'appPath', window: 'title' }))
+  Automator.prototype.moveCaretBelow = vi.fn()
   Automator.prototype.getSelectedText = vi.fn(() => selectedText)
   Automator.prototype.pasteText = vi.fn()
   Automator.prototype.copyToClipboard = vi.fn()
@@ -91,15 +91,17 @@ test('Prepare command', async () => {
   selectedText = 'Grabbed text'
 
   await Commander.initCommand()
-
-  expect(window.hideWindows).toHaveBeenCalledOnce()
-  expect(window.releaseFocus).toHaveBeenCalledOnce()
   expect(Automator.prototype.getSelectedText).toHaveBeenCalledOnce()
   expect(window.openCommandPicker).toHaveBeenCalledOnce()
 
   const params = (window.openCommandPicker as Mock).mock.calls[0][0]
   expect(params.textId).toBeDefined()
-  expect(params.sourceApp).toBe('appPath')
+  expect(params.sourceApp).toStrictEqual({
+    id: 'appId',
+    name: 'appName',
+    path: 'appPath',
+    window: 'title'
+  })
   expect(getCachedText(params.textId)).toBe('Grabbed text')
 
 })
@@ -109,14 +111,8 @@ test('Error while grabbing', async () => {
   selectedText = null
 
   await Commander.initCommand()
-
-  expect(window.hideWindows).toHaveBeenCalledOnce()
-  expect(window.releaseFocus).toHaveBeenCalledOnce()
-  expect(Automator.prototype.getSelectedText).toHaveBeenCalledOnce()
-
+  expect(Automator.prototype.getSelectedText).toHaveBeenCalled()
   expect(Notification).toHaveBeenCalledWith({ title: 'Witsy', body: expect.stringMatching(/error/) })
-
-  expect(window.restoreWindows).toHaveBeenCalledOnce()
 
 })
 
@@ -125,14 +121,8 @@ test('No text to grab', async () => {
   selectedText = ''
 
   await Commander.initCommand()
-
-  expect(window.hideWindows).toHaveBeenCalledOnce()
-  expect(window.releaseFocus).toHaveBeenCalledOnce()
-  expect(Automator.prototype.getSelectedText).toHaveBeenCalledOnce()
-
+  expect(Automator.prototype.getSelectedText).toHaveBeenCalled()
   expect(Notification).toHaveBeenCalledWith({ title: 'Witsy', body: expect.stringMatching(/highlight/) })
-
-  expect(window.restoreWindows).toHaveBeenCalledOnce()
 
 })
 
@@ -155,6 +145,8 @@ test('Prompt command', async () => {
   expect(args.sourceApp).toBe('appPath')
   expect(args.engine).toBe('mock')
   expect(args.model).toBe('chat')
+  expect(args.execute).toBe(false)
+  expect(args.replace).toBe(true)
 
 })
 
@@ -164,63 +156,39 @@ test('Other commands', async () => {
   const command = buildCommand('chat_window')
   await commander.execCommand(app, { textId: cachedTextId!, sourceApp: '', command })
 
-  expect(window.openCommandResult).toHaveBeenCalledOnce()
+  expect(window.openPromptAnywhere).toHaveBeenCalledOnce()
 
   expect(Automator.prototype.moveCaretBelow).not.toHaveBeenCalled()
   expect(Automator.prototype.pasteText).not.toHaveBeenCalled()
   expect(Automator.prototype.copyToClipboard).not.toHaveBeenCalled()
 
-  const args = (window.openCommandResult as Mock).mock.calls[0][0]
+  const args = (window.openPromptAnywhere as Mock).mock.calls[0][0]
   const prompt = getCachedText(args.promptId)
   expect(prompt).toBe('Explain this:\n"""Grabbed text"""')
   expect(args.engine).toBe('mock')
   expect(args.model).toBe('chat')
+  expect(args.execute).toBe(true)
+  expect(args.replace).toBe(true)
 
 })
 
-// test('Paste in-place command', async () => {
-
-//   const commander = new Commander()
-//   const command = buildCommand('paste_in_place')
-//   await commander.execCommand(null, cachedTextId, command)
-
-//   expect(window.openChatWindow).not.toHaveBeenCalled()
-//   expect(Automator.prototype.moveCaretBelow).not.toHaveBeenCalled()
-//   expect(Automator.prototype.pasteText).toHaveBeenCalledOnce()
-//   expect(Automator.prototype.copyToClipboard).not.toHaveBeenCalled()
-
-//   expect(Automator.prototype.pasteText).toHaveBeenCalledWith('[{"role":"user","content":"Explain this:\\n\\"\\"\\"Grabbed text\\"\\"\\""},{"role":"assistant","content":"Be kind. Don\'t mock me"}]')
-
-// })
-
-// test('Paste below command', async () => {
-
-//   const commander = new Commander()
-//   const command = buildCommand('paste_below')
-//   await commander.execCommand(null, cachedTextId, command)
-
-//   expect(window.openChatWindow).not.toHaveBeenCalled()
-//   expect(Automator.prototype.moveCaretBelow).toHaveBeenCalledOnce()
-//   expect(Automator.prototype.pasteText).toHaveBeenCalledOnce()
-//   expect(Automator.prototype.copyToClipboard).not.toHaveBeenCalled()
-
-//   expect(Automator.prototype.pasteText).toHaveBeenCalledWith('[{"role":"user","content":"Explain this:\\n\\"\\"\\"Grabbed text\\"\\"\\""},{"role":"assistant","content":"Be kind. Don\'t mock me"}]')
-
-// })
-
-// test('Copy to clipboard command', async () => {
-
-//   const commander = new Commander()
-//   const command = buildCommand('clipboard_copy')
-//   await commander.execCommand(null, cachedTextId, command)
-
-//   expect(window.openChatWindow).not.toHaveBeenCalled()
-//   expect(Automator.prototype.moveCaretBelow).not.toHaveBeenCalled()
-//   expect(Automator.prototype.pasteText).not.toHaveBeenCalled()
-//   expect(Automator.prototype.copyToClipboard).toHaveBeenCalledOnce()
-
-//   expect(Automator.prototype.copyToClipboard).toHaveBeenCalledWith('[{"role":"user","content":"Explain this:\\n\\"\\"\\"Grabbed text\\"\\"\\""},{"role":"assistant","content":"Be kind. Don\'t mock me"}]')
-//   //expect(clipboard.readText()).toBe('[{"role":"user","content":"Explain this:\\n\\"\\"\\"Grabbed text\\"\\"\\""},{"role":"assistant","content":"Be kind. Don\'t mock me"}]')
-
-// })
+test('No text', async () => {
   
+  const commander = new Commander()
+  const command = buildCommand('chat_window')
+  expect(await commander.execCommand(app, { textId: 'unknown', sourceApp: '', command })).toBe(false)
+
+  expect(window.openPromptAnywhere).not.toHaveBeenCalled()
+  expect(window.releaseFocus).not.toHaveBeenCalledOnce()
+
+})
+
+test('Error while executing', async () => {
+  
+  const commander = new Commander()
+  const command = buildCommand('chat_window')
+  expect(await commander.execCommand(app, { textId: cachedTextId!, sourceApp: 'error', command })).toBe(false)
+
+  expect(window.openPromptAnywhere).toHaveBeenCalledOnce()
+
+})

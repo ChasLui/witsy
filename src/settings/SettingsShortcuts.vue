@@ -70,6 +70,7 @@ const save = () => {
   store.config.shortcuts.transcribe = transcribe.value
   store.config.shortcuts.realtime = realtime.value
   store.saveSettings()
+  window.api.shortcuts.register()
 }
 
 defineExpose({ load })

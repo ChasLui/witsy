@@ -26,10 +26,11 @@ vi.mock('electron', async () => {
   BrowserWindow.prototype.loadURL = vi.fn()
   BrowserWindow.prototype.on = vi.fn()
   BrowserWindow.prototype.once = vi.fn()
-  BrowserWindow.prototype.setBounds = vi.fn()
-  BrowserWindow.prototype.setSize = vi.fn()
   BrowserWindow.prototype.getPosition =  vi.fn(() => [0, 0])
   BrowserWindow.prototype.getSize = vi.fn(() => [0, 0])
+  BrowserWindow.prototype.setPosition = vi.fn()
+  BrowserWindow.prototype.setBounds = vi.fn()
+  BrowserWindow.prototype.setSize = vi.fn()
   BrowserWindow['getAllWindows'] = vi.fn(() => {
     const window1 = new BrowserWindow()
     const window2 = new BrowserWindow()
@@ -73,6 +74,12 @@ vi.mock('electron', async () => {
     nativeTheme,
     BrowserWindow,
   }
+})
+
+vi.mock('../../src/automations/automator.ts', async () => {
+  const Automator = vi.fn()
+  Automator.prototype.getForemostApp = vi.fn(() => ({ id: 'appId', name: 'appName', path: 'appPath', window: 'title' }))
+  return { default: Automator }
 })
 
 vi.mock('../../src/main/utils', async () => {
@@ -185,18 +192,8 @@ test('Create command picker window', async () => {
 test('Close command picker window', async () => {
   await window.openCommandPicker({ textId: 'id' })
   await window.closeCommandPicker()
-  expect(window.commandPicker).toBeNull()
-})
-
-test('Open command result window', async () => {
-  await window.openCommandResult({ textId: 'id' })
-  expect(BrowserWindow.prototype.constructor).toHaveBeenCalledWith(expect.objectContaining({
-    hash: '/command',
-    queryParams: { textId: 'id' }
-  }))
-  expect(BrowserWindow.prototype.loadURL).toHaveBeenCalledWith('http://localhost:3000/?textId=id#/command')
-  const callParams = (BrowserWindow as unknown as Mock).mock.calls[0][0]
-  expectCreateWebPreferences(callParams)
+  expect(window.commandPicker).not.toBeNull()
+  expect(window.commandPicker.isVisible()).toBe(false)
 })
 
 test('Create prompt anywhere window', async () => {
@@ -230,15 +227,19 @@ test('Close prompt anywhere window', async () => {
   await window.openPromptAnywhere({})
   await window.closePromptAnywhere()
   expect(window.promptAnywhereWindow).not.toBeNull()
+  expect(window.promptAnywhereWindow.isVisible()).toBe(false)
 })
 
 test('Open Readaloud window', async () => {
-  await window.openReadAloudPalette('textId')
+  await window.openReadAloudPalette({ textId: 'textId', sourceApp: JSON.stringify({ id: 'appId', name: 'appName', path: 'appPath', window: 'title' }) })
   expect(BrowserWindow.prototype.constructor).toHaveBeenCalledWith(expect.objectContaining({
     hash: '/readaloud',
-    queryParams: { textId: 'textId' }
+    queryParams: {
+      textId: 'textId',
+      sourceApp: "{\"id\":\"appId\",\"name\":\"appName\",\"path\":\"appPath\",\"window\":\"title\"}"
+    }
   }))
-  expect(BrowserWindow.prototype.loadURL).toHaveBeenCalledWith('http://localhost:3000/?textId=textId#/readaloud')
+  expect(BrowserWindow.prototype.loadURL).toHaveBeenCalledWith('http://localhost:3000/?textId=textId&sourceApp=%7B%22id%22%3A%22appId%22%2C%22name%22%3A%22appName%22%2C%22path%22%3A%22appPath%22%2C%22window%22%3A%22title%22%7D#/readaloud')
   const callParams = (BrowserWindow as unknown as Mock).mock.calls[0][0]
   expectCreateWebPreferences(callParams)
 })
@@ -276,17 +277,6 @@ test('Open Realtime window', async () => {
   expect(BrowserWindow.prototype.loadURL).toHaveBeenCalledWith('http://localhost:3000/#/realtime')
   const callParams = (BrowserWindow as unknown as Mock).mock.calls[0][0]
   expectCreateWebPreferences(callParams)
-})
-
-test('Hides and restores active windows', async () => {
-  await window.restoreWindows()
-  expect(BrowserWindow.prototype.restore).toHaveBeenCalledTimes(0)
-  await window.hideWindows()
-  expect(BrowserWindow.prototype.hide).toHaveBeenCalledTimes(2)
-  await window.restoreWindows()
-  expect(BrowserWindow.prototype.restore).toHaveBeenCalledTimes(2)
-  await window.restoreWindows()
-  expect(BrowserWindow.prototype.restore).toHaveBeenCalledTimes(2)
 })
 
 test('MAS build warning', async () => {

@@ -2,6 +2,7 @@
 import { vi, beforeAll, beforeEach, expect, test, afterAll, Mock } from 'vitest'
 import { enableAutoUnmount, mount, VueWrapper } from '@vue/test-utils'
 import { useWindowMock } from '../mocks/window'
+import { store } from '../../src/services/store'
 import DocRepos from '../../src/screens/DocRepos.vue'
 
 enableAutoUnmount(afterAll)
@@ -9,19 +10,18 @@ enableAutoUnmount(afterAll)
 const onEventMock = vi.fn()
 const emitEventMock = vi.fn()
 
-vi.mock('../../src/composables/event_bus.js', async () => {
-  return { default: () => {
-    return {
-      onEvent: onEventMock,
-      emitEvent: emitEventMock
-    }
-  }}
+vi.mock('../../src/composables/event_bus', async () => {
+  return { default: () => ({
+    onEvent: onEventMock,
+    emitEvent: emitEventMock
+  })}
 })
 
 beforeAll(() => {
   useWindowMock()
   window.api.file.pick = vi.fn(() => [ 'file4', 'file5' ])
   window.api.file.pickDir = vi.fn(() => 'folder2')
+  store.loadSettings()
 })
 
 beforeEach(() => {

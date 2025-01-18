@@ -1,17 +1,18 @@
 
-import { strDict } from 'types/index';
+import { anyDict } from 'types/index';
 import { app, BrowserWindow } from 'electron';
 import { createWindow, getCurrentScreen, getCenteredCoordinates, ensureOnCurrentScreen } from './index';
 
 export let promptAnywhereWindow: BrowserWindow = null;
 
-const kWidthMinimum = 750;
+const kWidthMinimum = 800;
+const kWidthMaximum = 1000;
 const kWidthRatio = 2.25;
 
-export const preparePromptAnywhere = (queryParams?: strDict): BrowserWindow => {
+export const preparePromptAnywhere = (queryParams?: anyDict): BrowserWindow => {
 
   // get bounds
-  const width = Math.max(kWidthMinimum, Math.floor(getCurrentScreen().workAreaSize.width / kWidthRatio));
+  const width = Math.min(kWidthMaximum, Math.max(kWidthMinimum, Math.floor(getCurrentScreen().workAreaSize.width / kWidthRatio)));
   const height = getCurrentScreen().workAreaSize.height;
   const { x } = getCenteredCoordinates(width, height);
   const y = Math.floor(height * 0.15);
@@ -20,13 +21,13 @@ export const preparePromptAnywhere = (queryParams?: strDict): BrowserWindow => {
   promptAnywhereWindow = createWindow({
     hash: '/prompt',
     queryParams: queryParams,
-    x, y, width, height: Math.floor(height * 0.75),
+    x, y, width, height: Math.floor(height * 0.80),
     frame: false,
     skipTaskbar: true,
     alwaysOnTop: true,
     //opacity: 0.975,
     resizable: process.env.DEBUG ? true : false,
-    backgroundColor: 'rgba(0, 0, 0, 0)',
+    //backgroundColor: 'rgba(255, 255, 255, 0)',
     transparent: true,
     hiddenInMissionControl: true,
     keepHidden: true,
@@ -45,7 +46,7 @@ export const preparePromptAnywhere = (queryParams?: strDict): BrowserWindow => {
   
 }
 
-export const openPromptAnywhere = (params: strDict): BrowserWindow => {
+export const openPromptAnywhere = (params: anyDict): BrowserWindow => {
 
   // if we don't have a window, create one
   if (!promptAnywhereWindow || promptAnywhereWindow.isDestroyed()) {

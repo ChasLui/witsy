@@ -8,7 +8,6 @@
         <div class="icon">{{ command.icon }}</div>
         <div class="label">{{ command.label }}</div>
         <div class="shortcut" v-if="command.shortcut">{{ command.shortcut }}</div>
-        <!-- <div class="action"><component :is="action(command)"></component></div> -->
       </div>
     </div>
   </div>
@@ -16,20 +15,15 @@
 
 <script setup lang="ts">
 
-import { Command, ExternalApp } from 'types'
+import { anyDict, Command, ExternalApp } from '../types'
 import { ref, Ref, computed, onMounted, onUnmounted } from 'vue'
 import { store } from '../services/store'
-import {
-  BIconBoxArrowInUpRight,
-  BIconArrowReturnLeft,
-  BIconInputCursor,
-  BIconClipboard
-} from 'bootstrap-icons-vue'
 
 // load store
 store.loadSettings()
 store.loadCommands()
 
+let showParams: anyDict = {}
 const props = defineProps({
   extra: Object
 })
@@ -43,27 +37,36 @@ const iconData = computed(() => {
 })
 
 onMounted(() => {
+
+  // shortcuts work better at document level
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('keyup', onKeyUp)
-  if (props.extra?.sourceApp) {
-    sourceApp.value = window.api.file.getAppInfo(props.extra.sourceApp)
+  document.addEventListener('blur', onClose)
+
+  // events
+  window.api.on('show', onShow)
+
+  // query params
+  if (props.extra) {
+    onShow(props.extra)
   }
+
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('keyup', onKeyUp)
+  window.api.off('show', onShow)
 })
 
-const enabledCommands = computed(() => store.commands.filter(command => command.state == 'enabled'))
-
-const action = (command: Command) => {
-  if (overrideAction.value) return BIconBoxArrowInUpRight
-  if (command.action == 'chat_window') return BIconBoxArrowInUpRight
-  if (command.action == 'paste_below') return BIconArrowReturnLeft
-  if (command.action == 'paste_in_place') return BIconInputCursor
-  if (command.action == 'clipboard_copy') return BIconClipboard
+const onShow = (params?: anyDict) => {
+  //console.log('CommandPicker.onShow', JSON.stringify(params))
+  store.loadCommands()
+  showParams = params
+  sourceApp.value = showParams?.sourceApp ? window.api.file.getAppInfo(showParams.sourceApp.path) : null
 }
+
+const enabledCommands = computed(() => store.commands.filter(command => command.state == 'enabled'))
 
 const onKeyDown = (event: KeyboardEvent) => {
   if (event.key == 'Shift') {
@@ -74,7 +77,7 @@ const onKeyDown = (event: KeyboardEvent) => {
 const onKeyUp = (event: KeyboardEvent) => {
   overrideAction.value = false
   if (event.key == 'Escape') {
-    window.api.commands.closePicker()
+    onClose()
   } else {
     for (const command of enabledCommands.value) {
       if (command.shortcut?.toLowerCase() === event.key.toLowerCase()) {
@@ -85,10 +88,15 @@ const onKeyUp = (event: KeyboardEvent) => {
   }
 }
 
+const onClose = () => {
+  window.api.commands.closePicker(showParams.sourceApp)
+}
+
 const onRunCommand = (event: MouseEvent|KeyboardEvent, command: Command) => {
+  console.log(showParams)
   window.api.commands.run({
-    textId: props.extra.textId,
-    sourceApp: props.extra.sourceApp,
+    textId: showParams.textId,
+    sourceApp: showParams.sourceApp,
     command: JSON.parse(JSON.stringify(command))
   })
 }
